@@ -516,6 +516,7 @@
                 const res = await fetch(`${API_BASE}/payments`);
                 allPayments = await res.json();
                 renderPaymentTable(allPayments);
+                renderStatusPie(allPayments);
             } catch (e) {
                 console.error('Failed to fetch payments:', e);
             }
@@ -526,7 +527,6 @@
                 const res = await fetch(`${API_BASE}/audit?limit=100`);
                 allAudit = await res.json();
                 /* renderDecisionPie moved to fetchSummary */
-                renderStatusPie(allPayments);
                 renderActivityFeed(allAudit);
             } catch (e) {
                 console.error('Failed to fetch audit log:', e);
