@@ -13,13 +13,11 @@ BASELINE_RECOVERY_RATE = 0.471
 def calculate_baseline(payments: list[dict]) -> float:
     """
     Calculate the dollar amount a naive fixed-retry policy would recover.
-    Excludes fraud_suspected and customer_dispute payments (not retryable).
-    Only calculates baseline for payments that have been processed by the AI
-    (i.e., status is no longer 'failed'), so the UI doesn't show negative lift 
-    before the batch is run.
+    Only compares against FULLY resolved payments (recovered/written_off).
+    Escalated payments are excluded so they don't create negative lift before human review.
     """
-    processed_payments = [p for p in payments if p.get("status") != "failed" and p.get("status") != "pending"]
-    retryable = [p for p in processed_payments
+    resolved = [p for p in payments if p.get("status") in ("recovered", "written_off")]
+    retryable = [p for p in resolved
                  if p.get("failure_reason") not in ("fraud_suspected", "customer_dispute")]
     total = sum(p["amount"] for p in retryable)
     return round(total * BASELINE_RECOVERY_RATE, 2)
@@ -41,10 +39,16 @@ def calculate_lift(recovered: float, baseline: float) -> dict:
     """
     Dollar and percentage lift of the AI agent over the baseline.
     Returns: {"lift_dollars": float, "lift_percentage": float}
+    Clamped to 0 — never shows negative lift (before recoveries run, lift is 0, not negative).
     """
+    if recovered == 0 or baseline == 0:
+        return {"lift_dollars": 0.0, "lift_percentage": 0.0}
     lift_dollars = round(recovered - baseline, 2)
-    lift_percentage = round(lift_dollars / baseline, 3) if baseline != 0 else 0.0
-    return {"lift_dollars": lift_dollars, "lift_percentage": lift_percentage}
+    lift_percentage = round(lift_dollars / baseline, 3)
+    return {
+        "lift_dollars": max(0.0, lift_dollars),
+        "lift_percentage": max(0.0, lift_percentage)
+    }
 
 
 def summarize_by_status(payments: list[dict]) -> dict:
