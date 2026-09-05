@@ -10,6 +10,8 @@ from backend.llm_client import call_llm_json
 from backend.stopping_rules import check_all_stopping_rules
 from backend.escalation_rules import check_all_escalation_rules
 from backend.database import get_connection
+from backend.tools import check_fraud_database, calculate_customer_ltv_risk, estimate_recovery_probability
+import json
 
 RECOVERY_ACTIONS = [
     "retry_immediate",
@@ -21,7 +23,7 @@ RECOVERY_ACTIONS = [
 ]
 
 
-def build_agent_prompt(payment: dict[str, Any], customer: dict[str, Any], attempt_count: int) -> str:
+def build_agent_prompt(payment: dict[str, Any], customer: dict[str, Any], attempt_count: int, tool_data: dict[str, Any] = None) -> str:
     """
     Build the prompt for the LLM agent.
 
@@ -53,6 +55,9 @@ CUSTOMER CONTEXT:
 
 RECOVERY HISTORY:
 - Prior Attempts: {attempt_count}
+
+TOOL INTELLIGENCE GATHERED:
+{json.dumps(tool_data, indent=2) if tool_data else "None available"}
 
 AVAILABLE ACTIONS:
 1. retry_immediate - Retry same payment in next 5 minutes
@@ -174,7 +179,8 @@ def decide_recovery_action(payment_id: str) -> dict[str, Any]:
                 attempt_count=attempt_count,
                 stopping_reason=stop_result["reason"],
                 escalation_reason=None,
-                llm_called=False
+                llm_called=False,
+                llm_confidence=1.0
             )
             return {
                 "decision": "stop",
@@ -203,7 +209,8 @@ def decide_recovery_action(payment_id: str) -> dict[str, Any]:
                 attempt_count=attempt_count,
                 stopping_reason=None,
                 escalation_reason=escalation_result["reason"],
-                llm_called=False
+                llm_called=False,
+                llm_confidence=1.0
             )
             return {
                 "decision": "escalate",
@@ -215,8 +222,27 @@ def decide_recovery_action(payment_id: str) -> dict[str, Any]:
                 "audit_id": audit_id
             }
 
+        # Gather data from external tools
+        fraud_data = check_fraud_database(customer["id"], payment["amount"])
+        ltv_data = calculate_customer_ltv_risk(
+            customer["id"],
+            customer["tenure_days"],
+            customer["lifetime_value"],
+            customer.get("payment_failures_30d", 0)
+        )
+        recovery_stats = estimate_recovery_probability(
+            payment["amount"],
+            payment["failure_reason"],
+            attempt_count
+        )
+        tool_data = {
+            "fraud_check": fraud_data,
+            "ltv_analysis": ltv_data,
+            "recovery_statistics": recovery_stats
+        }
+
         # Build prompt and call LLM
-        prompt = build_agent_prompt(payment, customer, attempt_count)
+        prompt = build_agent_prompt(payment, customer, attempt_count, tool_data)
         llm_response = call_llm_json(prompt)
         parsed = parse_llm_response(llm_response)
 

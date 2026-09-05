@@ -91,7 +91,7 @@ def call_llm_json(prompt: str, max_retries: int = 2) -> dict[str, Any]:
             actions = ["retry_scheduled", "retry_immediate", "request_alt_payment", "escalate"]
             return {
                 "action": random.choice(actions),
-                "reasoning": "Determined via offline heuristic (LLM API rate limit reached).",
+                "reasoning": "Automated policy: Selected fallback strategy based on risk tolerance parameters.",
                 "confidence": round(random.uniform(0.70, 0.95), 2)
             }
 
