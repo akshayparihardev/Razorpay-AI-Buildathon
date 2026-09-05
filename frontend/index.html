@@ -557,7 +557,12 @@
         }
 
         async function runAllRecoveries() {
-            if (!confirm('This will process all pending payments. Continue?')) return;
+            const pendingPayments = allPayments.filter(p => p.status === 'failed');
+            if (pendingPayments.length === 0) {
+                alert('No pending payments to process.');
+                return;
+            }
+            if (!confirm(`This will process ${pendingPayments.length} pending payments. Continue?`)) return;
 
             const overlay = document.getElementById('progressOverlay');
             const progressText = document.getElementById('progressText');
@@ -567,24 +572,36 @@
             const confetti = document.getElementById('confetti');
 
             overlay.classList.add('visible');
+            progressText.textContent = `Processing payment 0 of ${pendingPayments.length}...`;
+            progressFill.style.width = `0%`;
+            progressFill.style.transition = 'width 0.2s';
 
             try {
-                const res = await fetch(`${API_BASE}/recover/all`, { method: 'POST' });
-                const result = await res.json();
-
-                overlay.classList.remove('visible');
-
-                if (result.results) {
-                    let processed = 0;
-                    for (const r of result.results) {
-                        processed++;
-                        progressText.textContent = `Processing payment ${processed} of ${result.total_processed}...`;
-                        progressFill.style.width = `${(processed / result.total_processed) * 100}%`;
-                        await fetchSummary();
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                let processed = 0;
+                const total = pendingPayments.length;
+                
+                // Process in chunks or sequentially with real UI updates
+                for (const p of pendingPayments) {
+                    processed++;
+                    progressText.textContent = `Processing payment ${processed} of ${total} (${p.id})...`;
+                    progressFill.style.width = `${(processed / total) * 100}%`;
+                    
+                    try {
+                        await fetch(`${API_BASE}/recover/${p.id}`, { method: 'POST' });
+                        // Fetch summary every 5 payments to keep dashboard updated in bg
+                        if (processed % 5 === 0) {
+                            await fetchSummary();
+                            await fetchAuditLog();
+                        }
+                    } catch(err) {
+                        console.error('Failed to recover ' + p.id, err);
                     }
+                    
+                    // Small delay to respect rate limits & allow UI to paint
+                    await new Promise(r => setTimeout(r, 600)); 
                 }
 
+                overlay.classList.remove('visible');
                 await fetchAllData();
 
                 completionMessage.textContent = `$${summaryData.total_recovered?.toFixed(2) || 0} recovered (${(summaryData.recovery_rate * 100).toFixed(1)}% rate, +${(summaryData.lift_percentage * 100).toFixed(1)}% lift over baseline)`;
