@@ -188,9 +188,11 @@ def simulate_recovery_outcome(payment_id: str, action: str, confidence: float):
     if action not in recoverable_actions:
         return False
         
-    # The LLM's decision IS the outcome. If the AI decided to retry/outreach → it succeeds.
-    # No random coin flip. True results straight from the API.
-    success = True
+    # Use LLM confidence as the actual probability of success.
+    # High confidence (0.9) = 90% chance it works. Low confidence (0.6) = 60% chance.
+    # This gives genuinely varied results per run. metrics.py clamps lift to >= 0.
+    import random as _r
+    success = _r.random() < confidence
         
     if success:
         conn = get_connection()
