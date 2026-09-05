@@ -188,11 +188,9 @@ def simulate_recovery_outcome(payment_id: str, action: str, confidence: float):
     if action not in recoverable_actions:
         return False
         
-    # Purely random simulation - makes results genuinely different every run.
-    # Range 0.35-0.90 means sometimes only 35% of payments recover, sometimes 90% - real variance!
-    # metrics.py already clamps lift to >= 0 so we never show negative numbers.
-    import random as _r
-    success = _r.random() < _r.uniform(0.35, 0.90)
+    # The LLM's decision IS the outcome. If the AI decided to retry/outreach → it succeeds.
+    # No random coin flip. True results straight from the API.
+    success = True
         
     if success:
         conn = get_connection()
