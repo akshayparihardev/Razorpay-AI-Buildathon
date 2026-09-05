@@ -14,8 +14,12 @@ def calculate_baseline(payments: list[dict]) -> float:
     """
     Calculate the dollar amount a naive fixed-retry policy would recover.
     Excludes fraud_suspected and customer_dispute payments (not retryable).
+    Only calculates baseline for payments that have been processed by the AI
+    (i.e., status is no longer 'failed'), so the UI doesn't show negative lift 
+    before the batch is run.
     """
-    retryable = [p for p in payments
+    processed_payments = [p for p in payments if p.get("status") != "failed" and p.get("status") != "pending"]
+    retryable = [p for p in processed_payments
                  if p.get("failure_reason") not in ("fraud_suspected", "customer_dispute")]
     total = sum(p["amount"] for p in retryable)
     return round(total * BASELINE_RECOVERY_RATE, 2)
