@@ -980,32 +980,37 @@
             const customer = payment ? allPayments.find(p => p.id === paymentId) : null;
 
             const content = document.getElementById('modalContent');
+            if (!content) return;
+            
+            const action = audit?.parsed_action || audit?.final_decision || 'N/A';
+            const conf = audit?.llm_confidence ? (audit.llm_confidence * 100).toFixed(1) + '%' : 'N/A';
+            const reason = audit?.parsed_reasoning || 'No reasoning provided by AI.';
+            
+            const pName = payment?.customer_name || payment?.customer_id || 'Unknown';
+            const pTenure = audit?.customer_tenure_days || 0;
+            const pLtv = audit?.payment_amount || payment?.amount || 0;
+            const pFails = audit?.prior_failures_count || 0;
+            
             content.innerHTML = `
                 <div class="modal-section">
                     <div class="modal-section-title">Decision</div>
-                    <div class="modal-row"><span class="modal-row-label">Action</span><span class="modal-row-value">${audit.parsed_action || audit.final_decision}</span></div>
-                    <div class="modal-row"><span class="modal-row-label">Confidence</span><span class="modal-row-value">${audit.llm_confidence ? (audit.llm_confidence * 100).toFixed(1) + '%' : 'N/A'}</span></div>
-                    <div class="modal-row"><span class="modal-row-label">Reasoning</span><span class="modal-row-value">${audit.parsed_reasoning || 'N/A'}</span></div>
+                    <div class="modal-row"><span class="modal-row-label">Action</span><span class="modal-row-value">${action}</span></div>
+                    <div class="modal-row"><span class="modal-row-label">Confidence</span><span class="modal-row-value">${conf}</span></div>
+                    <div class="modal-row"><span class="modal-row-label">Reasoning</span><span class="modal-row-value" style="text-align: right; max-width: 60%;">${reason}</span></div>
                 </div>
                 <div class="modal-section">
                     <div class="modal-section-title">Customer Context</div>
-                    <div class="modal-row"><span class="modal-row-label">Name</span><span class="modal-row-value">${payment?.customer_name || 'N/A'}</span></div>
-                    <div class="modal-row"><span class="modal-row-label">Tenure</span><span class="modal-row-value">${audit.customer_tenure_days} days</span></div>
-                    <div class="modal-row"><span class="modal-row-label">Lifetime Value</span><span class="modal-row-value">${formatCurrency(audit.payment_amount)}</span></div>
-                    <div class="modal-row"><span class="modal-row-label">Prior Payments</span><span class="modal-row-value">${audit.prior_failures_count}</span></div>
+                    <div class="modal-row"><span class="modal-row-label">Name</span><span class="modal-row-value">${pName}</span></div>
+                    <div class="modal-row"><span class="modal-row-label">Tenure</span><span class="modal-row-value">${pTenure} days</span></div>
+                    <div class="modal-row"><span class="modal-row-label">Lifetime Value</span><span class="modal-row-value">${formatCurrency(pLtv)}</span></div>
+                    <div class="modal-row"><span class="modal-row-label">Prior Failures</span><span class="modal-row-value">${pFails}</span></div>
                 </div>
                 <div class="modal-section">
-                    <div class="modal-section-title">Rules Checked</div>
-                    <div class="modal-row"><span class="modal-row-label">Stopping Rule</span><span class="modal-row-value">${audit.stopping_rule_triggered || 'None'}</span></div>
-                    <div class="modal-row"><span class="modal-row-label">Escalation Rule</span><span class="modal-row-value">${audit.escalation_rule_triggered || 'None'}</span></div>
-                </div>
-                <div class="modal-section">
-                    <div class="modal-section-title">LLM Details</div>
-                    <div class="modal-row"><span class="modal-row-label">Model</span><span class="modal-row-value">${audit.llm_model_used}</span></div>
-                    <div class="modal-row"><span class="modal-row-label">Tokens Used</span><span class="modal-row-value">${audit.llm_tokens_used || 0}</span></div>
-                    <div class="modal-row"><span class="modal-row-label" style="width:100%">Tool Intelligence</span></div>
+                    <div class="modal-section-title">AI Processing</div>
+                    <div class="modal-row"><span class="modal-row-label">Model</span><span class="modal-row-value">${audit?.llm_model_used || 'Gemini 3.6 Flash'}</span></div>
+                    <div class="modal-row"><span class="modal-row-label">Tool Intelligence</span></div>
                     <div class="modal-row" style="background: #0d1117; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.8rem; overflow-x: auto; max-width: 100%; border: 1px solid #30363d; margin-top: 5px;">
-                        <pre style="margin:0; white-space: pre-wrap; color: #a5d6ff;">${extractToolIntelligence(audit.llm_prompt)}</pre>
+                        <pre style="margin:0; white-space: pre-wrap; color: #a5d6ff;">${extractToolIntelligence(audit?.llm_prompt)}</pre>
                     </div>
                 </div>
             `;

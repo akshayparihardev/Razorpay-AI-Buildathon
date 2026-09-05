@@ -114,6 +114,8 @@ def generate_payment(payment_id: str, customer_id: str, failure_reason: str) -> 
 
 
 def seed_database() -> dict[str, Any]:
+    import random
+    random.seed(42)  # Reset the seed so every reset is deterministic
     random.seed(42)  # Reset PRNG state every time for deterministic demo data
     """
     Seed the database with 15 customers and 15 failed payments.
