@@ -243,7 +243,7 @@ def decide_recovery_action(payment_id: str) -> dict[str, Any]:
 
         # Build prompt and call LLM
         prompt = build_agent_prompt(payment, customer, attempt_count, tool_data)
-        llm_response = call_llm_json(prompt)
+        llm_response = call_llm_json(prompt, payment={**payment, "customer_tenure_days": customer["tenure_days"], "prior_failures_count": attempt_count})
         parsed = parse_llm_response(llm_response)
 
         # Check escalation rules again with LLM confidence
