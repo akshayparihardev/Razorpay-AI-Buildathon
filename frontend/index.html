@@ -567,10 +567,8 @@
         async function markReviewed() {
             if (!currentModalAudit) return;
             try {
-                await fetch(`${API_BASE}/audit/${currentModalAudit.id}/review`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ notes: 'Human reviewed' })
+                await fetch(`${API_BASE}/audit/${currentModalAudit.id}/review?notes=Human+reviewed`, {
+                    method: 'POST'
                 });
                 closeModal();
                 await fetchAuditLog();
