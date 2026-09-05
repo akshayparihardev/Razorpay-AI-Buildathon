@@ -28,13 +28,12 @@ LAST_NAMES = [
 ]
 
 FAILURE_REASONS = [
-    ("card_declined", 25),
-    ("insufficient_funds", 15),
-    ("network_error", 8),
-    ("expired_card", 5),
-    ("fraud_suspected", 3),
-    ("customer_dispute", 2),
-    ("authentication_required", 2),
+    ("card_declined", 6),
+    ("insufficient_funds", 4),
+    ("network_error", 2),
+    ("expired_card", 1),
+    ("fraud_suspected", 1),
+    ("authentication_required", 1),
 ]
 
 PLANS = [
@@ -116,7 +115,7 @@ def generate_payment(payment_id: str, customer_id: str, failure_reason: str) -> 
 
 def seed_database() -> dict[str, Any]:
     """
-    Seed the database with 60 customers and 60 failed payments.
+    Seed the database with 15 customers and 15 failed payments.
 
     Returns:
         dict: Summary of seeded data
@@ -141,7 +140,7 @@ def seed_database() -> dict[str, Any]:
         # Generate customers and payments
         customers = []
         payments = []
-        for i in range(60):
+        for i in range(15):
             cust_id = f"CUST_{i+1:03d}"
             pay_id = f"PAY_{i+1:03d}"
 
