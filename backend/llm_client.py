@@ -84,27 +84,11 @@ def call_llm_json(prompt: str, max_retries: int = 2) -> dict[str, Any]:
             }
 
         except google_exceptions.ResourceExhausted as e:
-            print(f"Rate limited (API Quota hit). Using fast fallback for demo.", file=sys.stderr)
-            # FAST DEMO FALLBACK: When the free tier API limit is hit (15 req/min),
-            # don't block the UI for 10 minutes. Gracefully degrade to a heuristic.
-            import random
-            actions = ["retry_scheduled", "retry_immediate", "request_alt_payment", "escalate"]
-            action = random.choice(actions)
-            # Create a smart, dynamic-sounding fallback so the demo looks legit even if rate-limited
-            if action == "retry_immediate":
-                reasoning = "Customer has a strong payment history and low fraud risk. Immediate retry is optimal to prevent churn."
-            elif action == "retry_scheduled":
-                reasoning = "Network failure detected. Scheduling a retry during off-peak hours maximizes success probability based on historical data."
-            elif action == "request_alt_payment":
-                reasoning = "Card expired or declined due to insufficient funds. Prompting for alternative payment method is required."
+            print(f"Rate limited by Gemini API (attempt {attempt + 1}). Sleeping for 5s to respect quota...", file=sys.stderr)
+            if attempt < max_retries:
+                time.sleep(5)
             else:
-                reasoning = "High risk indicators present (e.g., suspected fraud or multiple recent failures). Escalating for manual review."
-            
-            return {
-                "action": action,
-                "reasoning": reasoning,
-                "confidence": round(random.uniform(0.70, 0.95), 2)
-            }
+                return _fallback_response(max_retries, "ResourceExhausted (Rate Limit)")
 
         except google_exceptions.ServiceUnavailable as e:
             print(f"Service unavailable (attempt {attempt + 1}): {e}", file=sys.stderr)
