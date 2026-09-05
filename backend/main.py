@@ -187,39 +187,6 @@ def simulate_recovery_outcome(payment_id: str, action: str, confidence: float):
     return success
 
 
-@app.post("/api/recover/{payment_id}")
-async def recover_single(payment_id: str):
-    """Trigger recovery for a single payment."""
-    result = decide_recovery_action(payment_id)
-    if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
-
-    action = result["action"]
-    confidence = result.get("confidence", 0.5)
-
-    # Update payment status based on decision
-    new_status = update_payment_status(payment_id, action)
-
-    # Simulate recovery outcome for retry actions
-    recovered = simulate_recovery_outcome(payment_id, action, confidence)
-    if recovered:
-        new_status = "recovered"
-
-    return {
-        "payment_id": payment_id,
-        "decision": result["decision"],
-        "action": result["action"],
-        "reasoning": result["reasoning"],
-        "confidence": result["confidence"],
-        "stopped": result.get("stopped", False),
-        "escalated": result.get("escalated", False),
-        "llm_called": result.get("llm_called", False),
-        "audit_id": result["audit_id"],
-        "new_status": new_status,
-        "recovered": recovered
-    }
-
-
 @app.post("/api/recover/all")
 async def recover_all():
     """Trigger recovery for all pending payments."""
@@ -262,6 +229,39 @@ async def recover_all():
         await asyncio.sleep(1.0)
 
     return {"total_processed": len(results), "results": results}
+
+
+@app.post("/api/recover/{payment_id}")
+async def recover_single(payment_id: str):
+    """Trigger recovery for a single payment."""
+    result = decide_recovery_action(payment_id)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    action = result["action"]
+    confidence = result.get("confidence", 0.5)
+
+    # Update payment status based on decision
+    new_status = update_payment_status(payment_id, action)
+
+    # Simulate recovery outcome for retry actions
+    recovered = simulate_recovery_outcome(payment_id, action, confidence)
+    if recovered:
+        new_status = "recovered"
+
+    return {
+        "payment_id": payment_id,
+        "decision": result["decision"],
+        "action": result["action"],
+        "reasoning": result["reasoning"],
+        "confidence": result["confidence"],
+        "stopped": result.get("stopped", False),
+        "escalated": result.get("escalated", False),
+        "llm_called": result.get("llm_called", False),
+        "audit_id": result["audit_id"],
+        "new_status": new_status,
+        "recovered": recovered
+    }
 
 
 @app.post("/api/reset")
