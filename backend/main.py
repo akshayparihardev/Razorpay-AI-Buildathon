@@ -138,12 +138,73 @@ async def get_summary():
     }
 
 
+def update_payment_status(payment_id: str, action: str):
+    """Update payment status based on agent decision."""
+    action_to_status = {
+        "retry_immediate": "failed",       # still failed, retry pending
+        "retry_scheduled": "failed",       # still failed, retry scheduled
+        "request_alt_payment": "failed",   # awaiting alt payment
+        "customer_outreach": "failed",     # awaiting customer response
+        "escalate": "escalated",           # handed to human team
+        "stop": "written_off",             # given up
+    }
+    new_status = action_to_status.get(action, "failed")
+    conn = get_connection()
+    try:
+        conn.execute(
+            "UPDATE payments SET status = ? WHERE id = ?",
+            (new_status, payment_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return new_status
+
+
+def simulate_recovery_outcome(payment_id: str, action: str, confidence: float):
+    """
+    Simulate whether a retry actually succeeds.
+    In a real system, this would be an actual payment gateway call.
+    For the demo, we use confidence as the probability of success.
+    """
+    import random
+    # Actions that can directly recover money
+    recoverable_actions = ["retry_immediate", "retry_scheduled", "request_alt_payment", "customer_outreach"]
+    if action not in recoverable_actions:
+        return False
+    # Use confidence as probability — high confidence LLM decisions recover more
+    success = random.random() < confidence
+    if success:
+        conn = get_connection()
+        try:
+            conn.execute(
+                "UPDATE payments SET status = 'recovered' WHERE id = ?",
+                (payment_id,)
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return success
+
+
 @app.post("/api/recover/{payment_id}")
 async def recover_single(payment_id: str):
     """Trigger recovery for a single payment."""
     result = decide_recovery_action(payment_id)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
+
+    action = result["action"]
+    confidence = result.get("confidence", 0.5)
+
+    # Update payment status based on decision
+    new_status = update_payment_status(payment_id, action)
+
+    # Simulate recovery outcome for retry actions
+    recovered = simulate_recovery_outcome(payment_id, action, confidence)
+    if recovered:
+        new_status = "recovered"
+
     return {
         "payment_id": payment_id,
         "decision": result["decision"],
@@ -153,7 +214,9 @@ async def recover_single(payment_id: str):
         "stopped": result.get("stopped", False),
         "escalated": result.get("escalated", False),
         "llm_called": result.get("llm_called", False),
-        "audit_id": result["audit_id"]
+        "audit_id": result["audit_id"],
+        "new_status": new_status,
+        "recovered": recovered
     }
 
 
@@ -172,6 +235,17 @@ async def recover_all():
     results = []
     for payment_id in pending_ids:
         result = decide_recovery_action(payment_id)
+        action = result["action"]
+        confidence = result.get("confidence", 0.5)
+
+        # Update payment status based on decision
+        new_status = update_payment_status(payment_id, action)
+
+        # Simulate recovery outcome
+        recovered = simulate_recovery_outcome(payment_id, action, confidence)
+        if recovered:
+            new_status = "recovered"
+
         results.append({
             "payment_id": payment_id,
             "decision": result["decision"],
@@ -181,7 +255,9 @@ async def recover_all():
             "stopped": result.get("stopped", False),
             "escalated": result.get("escalated", False),
             "llm_called": result.get("llm_called", False),
-            "audit_id": result["audit_id"]
+            "audit_id": result["audit_id"],
+            "new_status": new_status,
+            "recovered": recovered
         })
         await asyncio.sleep(1.0)
 
