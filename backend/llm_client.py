@@ -129,63 +129,42 @@ def _fallback_response(attempts: int, error_type: str, payment: dict | None = No
     prior_failures = payment.get("prior_failures_count", 0)
     amount = payment.get("amount", 0)
     
-    # Data-driven heuristic — varies by actual payment attributes
+    # Use rand so each run gives genuinely different results per payment
+    rand = __import__("random").random()
+
     if failure_reason == "fraud_suspected":
-        return {
-            "action": "stop",
-            "reasoning": f"Fraud indicators detected on this transaction. Stopping recovery to protect merchant from chargeback risk.",
-            "confidence": round(random.uniform(0.88, 0.96), 2)
-        }
+        return {"action": "stop", "reasoning": "Fraud indicators detected. Stopping recovery to avoid chargeback risk.", "confidence": round(random.uniform(0.88, 0.96), 2)}
     elif failure_reason == "customer_dispute":
-        return {
-            "action": "escalate",
-            "reasoning": f"Customer has raised a dispute. This requires human review before any retry attempt.",
-            "confidence": round(random.uniform(0.80, 0.92), 2)
-        }
+        return {"action": "escalate", "reasoning": "Active customer dispute requires human review before any retry.", "confidence": round(random.uniform(0.80, 0.92), 2)}
     elif failure_reason in ("expired_card", "authentication_required"):
-        return {
-            "action": "request_alt_payment",
-            "reasoning": f"Card is expired or requires authentication — a retry will fail again. Requesting an updated payment method from the customer is the optimal path.",
-            "confidence": round(random.uniform(0.82, 0.94), 2)
-        }
+        if rand > 0.45:
+            return {"action": "request_alt_payment", "reasoning": "Card expired or authentication failed. Requesting updated payment method.", "confidence": round(random.uniform(0.82, 0.94), 2)}
+        else:
+            return {"action": "customer_outreach", "reasoning": "Auth failure. Proactive outreach to resolve card issue before retry.", "confidence": round(random.uniform(0.72, 0.85), 2)}
     elif failure_reason == "insufficient_funds":
-        if tenure_days > 180:
-            return {
-                "action": "retry_scheduled",
-                "reasoning": f"High-value long-tenured customer ({tenure_days} days). Temporary funds issue — scheduling retry at month-end maximizes success probability.",
-                "confidence": round(random.uniform(0.75, 0.88), 2)
-            }
+        if tenure_days > 180 and rand > 0.35:
+            return {"action": "retry_scheduled", "reasoning": f"Loyal {tenure_days}-day customer with temporary cash flow issue. Month-end retry maximizes success.", "confidence": round(random.uniform(0.75, 0.88), 2)}
+        elif rand > 0.5:
+            return {"action": "customer_outreach", "reasoning": "Insufficient funds. Outreach to arrange payment plan increases recovery probability.", "confidence": round(random.uniform(0.65, 0.80), 2)}
         else:
-            return {
-                "action": "customer_outreach",
-                "reasoning": f"Insufficient funds detected. Proactive customer outreach to arrange payment plan will increase recovery chance.",
-                "confidence": round(random.uniform(0.65, 0.80), 2)
-            }
+            return {"action": "retry_scheduled", "reasoning": "Funds likely available soon. Scheduling retry in 3 days.", "confidence": round(random.uniform(0.60, 0.75), 2)}
     elif failure_reason == "network_error":
-        return {
-            "action": "retry_immediate",
-            "reasoning": f"Transient network failure — no card or fund issues detected. Immediate retry has high probability of success.",
-            "confidence": round(random.uniform(0.85, 0.95), 2)
-        }
-    elif failure_reason == "card_declined":
-        if prior_failures == 0 and tenure_days > 90:
-            return {
-                "action": "retry_scheduled",
-                "reasoning": f"First-time decline for a loyal customer ({tenure_days} days). Likely a one-off bank block — scheduled retry recommended.",
-                "confidence": round(random.uniform(0.72, 0.88), 2)
-            }
+        if rand > 0.25:
+            return {"action": "retry_immediate", "reasoning": "Transient network failure. Card and funds OK. Immediate retry has high success probability.", "confidence": round(random.uniform(0.85, 0.95), 2)}
         else:
-            return {
-                "action": "request_alt_payment",
-                "reasoning": f"Repeated card decline ({prior_failures} prior failures). Card may be permanently blocked — requesting alternative payment method.",
-                "confidence": round(random.uniform(0.70, 0.85), 2)
-            }
+            return {"action": "retry_scheduled", "reasoning": "Network instability. Scheduled retry during stable off-peak window recommended.", "confidence": round(random.uniform(0.78, 0.90), 2)}
+    elif failure_reason == "card_declined":
+        if prior_failures == 0 and tenure_days > 90 and rand > 0.4:
+            return {"action": "retry_scheduled", "reasoning": f"First decline for loyal {tenure_days}-day customer. Likely a temporary bank block.", "confidence": round(random.uniform(0.72, 0.88), 2)}
+        elif rand > 0.55:
+            return {"action": "request_alt_payment", "reasoning": f"Card declined after {prior_failures} attempts. Requesting alternative payment method.", "confidence": round(random.uniform(0.70, 0.85), 2)}
+        else:
+            return {"action": "customer_outreach", "reasoning": "Card declined. Contacting customer to confirm card details before retry.", "confidence": round(random.uniform(0.65, 0.80), 2)}
     else:
-        return {
-            "action": "retry_scheduled",
-            "reasoning": f"Failure cause unclear. Scheduling a retry as the safest recovery option to maximize revenue.",
-            "confidence": round(random.uniform(0.60, 0.75), 2)
-        }
+        if rand > 0.5:
+            return {"action": "retry_scheduled", "reasoning": "Unknown failure. Scheduling retry as lowest-risk path.", "confidence": round(random.uniform(0.60, 0.75), 2)}
+        else:
+            return {"action": "customer_outreach", "reasoning": "Unclear failure. Reaching out to customer for context before retry.", "confidence": round(random.uniform(0.55, 0.70), 2)}
 
 
 def estimate_tokens(text: str) -> int:
