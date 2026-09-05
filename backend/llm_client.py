@@ -39,8 +39,8 @@ def get_model() -> genai.GenerativeModel:
     return genai.GenerativeModel(
         model_name=MODEL_NAME,
         generation_config={
-            "temperature": 0.3,
-            "top_p": 0.9,
+            "temperature": 0.8,
+            "top_p": 0.95,
             "top_k": 40,
             "max_output_tokens": 2048,
             "response_mime_type": "application/json",
